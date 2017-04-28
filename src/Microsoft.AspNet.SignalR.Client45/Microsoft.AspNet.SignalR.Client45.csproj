@@ -87,6 +87,9 @@
     <Compile Include="..\Microsoft.AspNet.SignalR.Client\HubConnection.cs">
       <Link>HubConnection.cs</Link>
     </Compile>
+    <Compile Include="..\Microsoft.AspNet.SignalR.Client\HubConnectionD.cs">
+      <Link>HubConnectionD.cs</Link>
+    </Compile>
     <Compile Include="..\Microsoft.AspNet.SignalR.Client\HubException.cs">
       <Link>HubException.cs</Link>
     </Compile>

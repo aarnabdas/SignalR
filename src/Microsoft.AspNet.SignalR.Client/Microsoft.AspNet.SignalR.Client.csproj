@@ -84,6 +84,7 @@
     <Compile Include="Http\IResponse.cs" />
     <Compile Include="Http\IResponseExtensions.cs" />
     <Compile Include="HubConnection.cs" />
+    <Compile Include="HubConnectionD.cs" />
     <Compile Include="HubException.cs" />
     <Compile Include="HubProxyExtensions.cs" />
     <Compile Include="Hubs\HubInvocation.cs" />

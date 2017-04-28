@@ -66,7 +66,7 @@ namespace Microsoft.AspNet.SignalR.Crank
 
 			if (Factory == null)
 			{
-				Factory = new DefaultConnectionFactory();
+				Factory = new HubConnectionFatory();
 				Console.WriteLine("Using default connection factory...");
 			}
 		}
@@ -203,11 +203,15 @@ namespace Microsoft.AspNet.SignalR.Crank
         {
             var payload = (Arguments.SendBytes == 0) ? String.Empty : new string('a', Arguments.SendBytes);
 
+            Thread.Sleep(2500);
             while (TestPhase == ControllerEvents.Send)
             {
                 if (!String.IsNullOrEmpty(payload))
                 {
-                    await Task.WhenAll(Connections.Select(c => c.Send(payload)));
+                    await Task.WhenAll(Connections.Select(c => c.Send(new MessageItem()
+                    {
+                        Name = c.Items["name"] as string
+                    })));
                 }
 
                 await Task.Delay(Arguments.SendInterval);
@@ -229,8 +233,8 @@ namespace Microsoft.AspNet.SignalR.Crank
         private static async Task RunConnect()
         {
             var batched = Arguments.BatchSize > 1;
-
-            while (TestPhase == ControllerEvents.Connect)
+            int connectedCount = 0;
+            do
             {
                 if (batched)
                 {
@@ -240,9 +244,21 @@ namespace Microsoft.AspNet.SignalR.Crank
                 {
                     await ConnectSingle();
                 }
+                connectedCount = Connections.Where(c => c.State == ConnectionState.Connected).Count();
+            } while (connectedCount <= Arguments.Connections);
+            //while (TestPhase == ControllerEvents.Connect)
+            //{
+            //    if (batched)
+            //    {
+            //        await ConnectBatch();
+            //    }
+            //    else
+            //    {
+            //        await ConnectSingle();
+            //    }
 
-                await Task.Delay(Arguments.ConnectInterval);
-            }
+            //    await Task.Delay(Arguments.ConnectInterval);
+            //}
         }
 
         private static async Task ConnectBatch()
@@ -276,6 +292,8 @@ namespace Microsoft.AspNet.SignalR.Crank
                 {
                     Connections.TryTake(out connection);
                 };
+
+                connection.Items.Add("name", RandomGenerator.Name());
 
                 Connections.Add(connection);
             }

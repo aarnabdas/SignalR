@@ -397,7 +397,7 @@ namespace Microsoft.AspNet.SignalR.Client
             {
                 return _state;
             }
-            private set
+            protected set
             {
                 lock (_stateLock)
                 {
@@ -419,7 +419,7 @@ namespace Microsoft.AspNet.SignalR.Client
         /// Starts the <see cref="Connection"/>.
         /// </summary>
         /// <returns>A task that represents when the connection has started.</returns>
-        public Task Start()
+        public virtual Task Start()
         {
             return Start(new DefaultHttpClient());
         }
@@ -430,7 +430,7 @@ namespace Microsoft.AspNet.SignalR.Client
         /// <param name="httpClient">The http client</param>
         /// <returns>A task that represents when the connection has started.</returns>
         [SuppressMessage("Microsoft.Reliability", "CA2000:Dispose objects before losing scope", Justification = "This is disposed on close")]
-        public Task Start(IHttpClient httpClient)
+        public virtual Task Start(IHttpClient httpClient)
         {
             // Pick the best transport supported by the client
             return Start(new AutoTransport(httpClient));
@@ -441,7 +441,7 @@ namespace Microsoft.AspNet.SignalR.Client
         /// </summary>
         /// <param name="transport">The transport to use.</param>
         /// <returns>A task that represents when the connection has started.</returns>
-        public Task Start(IClientTransport transport)
+        public virtual Task Start(IClientTransport transport)
         {
             if (transport == null)
             {
@@ -534,7 +534,7 @@ namespace Microsoft.AspNet.SignalR.Client
                              .Then(() => _lastQueuedReceiveTask);
         }
 
-        private bool ChangeState(ConnectionState oldState, ConnectionState newState)
+        protected bool ChangeState(ConnectionState oldState, ConnectionState newState)
         {
             return ((IConnection)this).ChangeState(oldState, newState);
         }

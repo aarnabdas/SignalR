@@ -68,8 +68,11 @@
     <Reference Include="System" />
     <Reference Include="System.ComponentModel.Composition" />
     <Reference Include="System.ComponentModel.Composition.Registration" />
+    <Reference Include="System.Configuration" />
     <Reference Include="System.Core" />
     <Reference Include="Microsoft.CSharp" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.XML" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="..\Common\CommonAssemblyInfo.cs">
@@ -83,6 +86,7 @@
     <Compile Include="ControllerHub.cs" />
     <Compile Include="Client.cs" />
     <Compile Include="CrankArguments.cs" />
+    <Compile Include="DAL\MessageItemsLayer.cs" />
     <Compile Include="DefaultConnectionFactory.cs" />
     <Compile Include="HubConnectionFatory.cs" />
     <Compile Include="IConnectionFactory.cs" />

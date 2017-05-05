@@ -92,6 +92,8 @@ namespace Microsoft.AspNet.SignalR.Crank
                 await Task.Delay(CrankArguments.ConnectionPollIntervalMS);
             }
 
+            //DAL.MessageItemsLayer.ClearMessages();
+
             await RunConnect();
             await RunSend();
 
@@ -171,6 +173,16 @@ namespace Microsoft.AspNet.SignalR.Crank
         {
             var states = Connections.Select(c => c.State);
 
+            var messages = Connections.SelectMany(c => c.SentMessages.OfType<MessageItem>());
+
+            if (messages.Count() > 0)
+            {
+                //DAL.MessageItemsLayer.PersistSentMessages(new MessageItems()
+                //{
+                //    Messages = messages.ToArray<MessageItem>()
+                //}.XmlSerializeObject<MessageItems>());
+                Connections.Select(c => c.ClearSentMessages());
+            }
             var statesArr = new int[3]
             {
                 states.Where(s => s == ConnectionState.Connected).Count(),
@@ -208,10 +220,10 @@ namespace Microsoft.AspNet.SignalR.Crank
             {
                 if (!String.IsNullOrEmpty(payload))
                 {
-                    await Task.WhenAll(Connections.Select(c => c.Send(new MessageItem()
-                    {
-                        Name = c.Items["name"] as string
-                    })));
+                    //await Task.WhenAll(Connections.Select(c => c.Send(new MessageItem()
+                    //{
+                    //    Name = c.Items["name"] as string
+                    //})));
                 }
 
                 await Task.Delay(Arguments.SendInterval);

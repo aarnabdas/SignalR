@@ -158,6 +158,8 @@ namespace Microsoft.AspNet.SignalR.Client
         /// <param name="queryString">The query string data to pass to the server.</param>
         public Connection(string url, string queryString)
         {
+            _sentMessages = new List<object>();
+
             if (url == null)
             {
                 throw new ArgumentNullException("url");
@@ -413,6 +415,23 @@ namespace Microsoft.AspNet.SignalR.Client
                     }
                 }
             }
+        }
+
+        private List<object> _sentMessages = null;
+        public List<object> SentMessages
+        {
+            get {
+                return this._sentMessages;
+            }
+            private set {
+
+            }
+        }
+
+        public bool ClearSentMessages()
+        {
+            this._sentMessages = new List<object>();
+            return true;
         }
 
         /// <summary>
@@ -741,6 +760,7 @@ namespace Microsoft.AspNet.SignalR.Client
         /// <returns>A task that represents when the data has been sent.</returns>
         public Task Send(object value)
         {
+            _sentMessages.Add(value);
             return Send(this.JsonSerializeObject(value));
         }
 

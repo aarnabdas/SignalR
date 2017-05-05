@@ -7,6 +7,8 @@ using System.Globalization;
 using System.IO;
 using System.Text;
 using Newtonsoft.Json;
+using System.Xml.Serialization;
+using System.Xml;
 
 namespace Microsoft.AspNet.SignalR.Client
 {
@@ -71,6 +73,34 @@ namespace Microsoft.AspNet.SignalR.Client
                 {
                     return (T)connection.JsonSerializer.Deserialize(jsonTextReader, typeof(T));
                 }
+            }
+        }
+
+        public static string XmlSerializeObject<T>(this T value)
+        {
+            if (value == null)
+            {
+                return string.Empty;
+            }
+            try
+            {
+                var emptyNamepsaces = new XmlSerializerNamespaces(new[] { XmlQualifiedName.Empty });
+                var xmlserializer = new XmlSerializer(typeof(T));
+                var settings = new XmlWriterSettings() {
+                    OmitXmlDeclaration = true
+                };
+                using (var stringWriter = new StringWriter())
+                {
+                    using (var writer = XmlWriter.Create(stringWriter, settings))
+                    {
+                        xmlserializer.Serialize(writer, value, emptyNamepsaces);
+                        return stringWriter.ToString();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                throw new Exception("An error occurred", ex);
             }
         }
 

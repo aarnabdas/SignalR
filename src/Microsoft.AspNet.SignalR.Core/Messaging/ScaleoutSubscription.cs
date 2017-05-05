@@ -39,7 +39,7 @@ namespace Microsoft.AspNet.SignalR.Messaging
 
             if (traceManager == null)
             {
-                throw new ArgumentNullException(nameof(traceManager));
+                throw new ArgumentNullException("TraceManager was null");
             }
 
             _streams = streams;

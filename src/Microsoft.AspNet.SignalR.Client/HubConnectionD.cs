@@ -19,7 +19,20 @@ namespace Microsoft.AspNet.SignalR.Client
         {
             this.State = ConnectionState.Disconnected;
             connection = new HubConnection(url);
-            customHub = connection.CreateHubProxy("ChatHub");
+            customHub = connection.CreateHubProxy("messageHub");
+
+            connection.Received += connection_Received;
+            connection.StateChanged +=connection_StateChanged;
+        }
+
+        private void connection_StateChanged(StateChange obj)
+        {
+            this.ChangeState(obj.NewState, this.State);
+        }
+
+        private void connection_Received(string obj)
+        {
+            Console.WriteLine(obj);
         }
 
         public override Task Start(IHttpClient httpClient)
@@ -43,9 +56,24 @@ namespace Microsoft.AspNet.SignalR.Client
                 }
                 else
                 {
-                    this.ChangeState(ConnectionState.Connecting, ConnectionState.Connected);
+                    //  $.connection.hub.createHubProxy('messageHub').invoke('subscribe','Team A');
+                    customHub.Invoke<string>("Subscribe", "Team A").ContinueWith(subTask => {
+                        if (subTask.IsFaulted)
+                        {
+                            Console.WriteLine("Exception occurred during subscription: {0}", subTask.Exception.GetBaseException());
+                        }
+                        else
+                        {
+                            this.ChangeState(ConnectionState.Connecting, ConnectionState.Connected);
+                        }
+                    });
                 }
             });
+        }
+
+        protected override void OnMessageReceived(Newtonsoft.Json.Linq.JToken message)
+        {
+            Console.WriteLine(message.ToString());
         }
 
         public override Task Send(string data)

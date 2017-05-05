@@ -122,7 +122,7 @@ namespace Microsoft.AspNet.SignalR.Configuration
             {
                 if (value < 0)
                 {
-                    throw new ArgumentOutOfRangeException(nameof(value), Resources.Error_MaxScaleoutMappingsPerStreamMustBeNonNegative);
+                    throw new ArgumentOutOfRangeException("MaxScaleoutMappingsPerStream was set to invalid value", Resources.Error_MaxScaleoutMappingsPerStreamMustBeNonNegative);
                 }
 
                 _maxScaleoutMappingPerStream = value;

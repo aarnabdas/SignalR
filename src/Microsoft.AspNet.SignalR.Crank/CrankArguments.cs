@@ -20,7 +20,7 @@ namespace Microsoft.AspNet.SignalR.Crank
         [CommandLineParameter(Command = "?", Name = "Help", Default = false, Description = "Show Help", IsHelp = true)]
         public bool Help { get; set; }
 
-        [CommandLineParameter(Command = "Url", Required = true, Description = "Server URL for SignalR connections")]
+        [CommandLineParameter(Command = "Url", Required = false, Description = "Server URL for SignalR connections")]
         public string Url { get; set; }
 
         [CommandLineParameter(Command = "Transport", Required = false, Default = "auto", Description = "Transport name. Default: auto")]
@@ -64,6 +64,9 @@ namespace Microsoft.AspNet.SignalR.Crank
 
         [CommandLineParameter(Command = "SignalRInstance", Required = false, Description = "Instance name for SignalR counters on the server. Defaults to using client connection states.")]
         public string SignalRInstance { get; set; }
+
+        [CommandLineParameter(Command = "Config", Required = true, Description = "Configuration file containing information regarding creating connections")]
+        public string ConfigFile { get; set; }
 
         public string Controller
         {

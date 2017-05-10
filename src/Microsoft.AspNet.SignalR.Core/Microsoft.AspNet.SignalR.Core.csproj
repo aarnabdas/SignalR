@@ -55,6 +55,7 @@
       <HintPath>..\..\packages\Owin.1.0\lib\net40\Owin.dll</HintPath>
     </Reference>
     <Reference Include="System" />
+    <Reference Include="System.Configuration" />
     <Reference Include="System.Core" />
     <Reference Include="Microsoft.CSharp" />
     <Reference Include="System.Security" />
@@ -71,6 +72,9 @@
     </Compile>
     <Compile Include="Configuration\ConfigurationExtensions.cs" />
     <Compile Include="ConnectionConfiguration.cs" />
+    <Compile Include="ConnectionConfiguration\ConnectionConfigurationCollection.cs" />
+    <Compile Include="ConnectionConfiguration\ConnectionConfigurationElement.cs" />
+    <Compile Include="ConnectionConfiguration\ConnectionConfigurationSection.cs" />
     <Compile Include="Hosting\INameValueCollection.cs" />
     <Compile Include="Hosting\IResponse.cs" />
     <Compile Include="Hubs\HubBase.cs" />

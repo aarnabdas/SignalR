@@ -10,6 +10,9 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNet.SignalR.Client;
+using System.Configuration;
+using Microsoft.AspNet.SignalR.Core.ConnectionConfiguration;
+using System.Collections.Generic;
 
 namespace Microsoft.AspNet.SignalR.Crank
 {
@@ -17,11 +20,12 @@ namespace Microsoft.AspNet.SignalR.Crank
     {
         private static CrankArguments Arguments;
         private static ConcurrentBag<Connection> Connections = new ConcurrentBag<Connection>();
+        private static ConcurrentDictionary<string, List<Connection>> ConnectionsDictionary = new ConcurrentDictionary<string, List<Connection>>();
         private static ConcurrentBag<IHubProxy> HubProxies = new ConcurrentBag<IHubProxy>();
         private static HubConnection ControllerConnection;
         private static IHubProxy ControllerProxy;
         private static ControllerEvents TestPhase = ControllerEvents.None;
-	    private static IConnectionFactory Factory;
+        private static IConnectionFactory Factory;
 
         public static void Main()
         {
@@ -30,7 +34,7 @@ namespace Microsoft.AspNet.SignalR.Crank
             ThreadPool.SetMinThreads(Arguments.Connections, 2);
             TaskScheduler.UnobservedTaskException += OnUnobservedTaskException;
 
-	        ComposeConnectionFactory();
+            ComposeConnectionFactory();
 
             if (Arguments.IsController)
             {
@@ -40,38 +44,38 @@ namespace Microsoft.AspNet.SignalR.Crank
             Run().Wait();
         }
 
-		private static void ComposeConnectionFactory()
-		{
-			try
-			{
-				using (var catalog = new DirectoryCatalog(AppDomain.CurrentDomain.BaseDirectory))
-				using (var container = new CompositionContainer(catalog))
-				{
-					var export = container.GetExportedValueOrDefault<IConnectionFactory>();
-					if (export != null)
-					{
-						Factory = export;
-						Console.WriteLine("Using {0}", Factory.GetType());
-					}
-				}
-			}
-			catch (ImportCardinalityMismatchException)
-			{
-				Console.WriteLine("More than one IConnectionFactory import was found.");
-			}
-			catch (Exception e)
-			{
-				Console.WriteLine(e);
-			}
+        private static void ComposeConnectionFactory()
+        {
+            try
+            {
+                using (var catalog = new DirectoryCatalog(AppDomain.CurrentDomain.BaseDirectory))
+                using (var container = new CompositionContainer(catalog))
+                {
+                    var export = container.GetExportedValueOrDefault<IConnectionFactory>();
+                    if (export != null)
+                    {
+                        Factory = export;
+                        Console.WriteLine("Using {0}", Factory.GetType());
+                    }
+                }
+            }
+            catch (ImportCardinalityMismatchException)
+            {
+                Console.WriteLine("More than one IConnectionFactory import was found.");
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e);
+            }
 
-			if (Factory == null)
-			{
-				Factory = new HubConnectionFatory();
-				Console.WriteLine("Using default connection factory...");
-			}
-		}
+            if (Factory == null)
+            {
+                Factory = new HubConnectionFatory();
+                Console.WriteLine("Using default connection factory...");
+            }
+        }
 
-	    private static async Task Run()
+        private static async Task Run()
         {
             var remoteController = !Arguments.IsController || (Arguments.NumClients > 1);
 
@@ -244,80 +248,96 @@ namespace Microsoft.AspNet.SignalR.Crank
 
         private static async Task RunConnect()
         {
-            var batched = Arguments.BatchSize > 1;
-            int connectedCount = 0;
-            do
+            try
             {
-                if (batched)
+                ExeConfigurationFileMap configMap = new ExeConfigurationFileMap();
+                configMap.ExeConfigFilename = Arguments.ConfigFile;
+                System.Configuration.Configuration config = ConfigurationManager.OpenMappedExeConfiguration(configMap, ConfigurationUserLevel.None);
+
+                ConnectionConfigurationSection configurationSection = (ConnectionConfigurationSection)config.GetSection("connections.conf");
+                if (configurationSection != null && configurationSection.Connections != null && configurationSection.Connections.Count > 0)
                 {
-                    await ConnectBatch();
+                    int i = 0;
+                    Task[] connectTasks = new Task[configurationSection.Connections.Count];
+                    foreach (ConnectionConfigurationElement connConf in configurationSection.Connections)
+                    {
+                        connectTasks[i] = Task.Factory.StartNew(() =>
+                        {
+                            Connect(connConf);
+                        });
+                        i++;
+                    }
+                    await Task.WhenAll(connectTasks);
                 }
                 else
                 {
-                    await ConnectSingle();
+                    throw new ConfigurationErrorsException("No connection specified in the configuration!!!");
                 }
-                connectedCount = Connections.Where(c => c.State == ConnectionState.Connected).Count();
-            } while (connectedCount <= Arguments.Connections);
-            //while (TestPhase == ControllerEvents.Connect)
-            //{
-            //    if (batched)
-            //    {
-            //        await ConnectBatch();
-            //    }
-            //    else
-            //    {
-            //        await ConnectSingle();
-            //    }
-
-            //    await Task.Delay(Arguments.ConnectInterval);
-            //}
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e.Message);
+            }
         }
 
-        private static async Task ConnectBatch()
+        private static void Connect(ConnectionConfigurationElement connConf)
+        {
+            int connectedCount = 0;
+            do
+            {
+                ConnectBatch(connConf);
+                connectedCount = ConnectionsDictionary[connConf.Name].Where(c => c.State == ConnectionState.Connected).Count();
+            } while (connectedCount <= connConf.Connections);
+        }
+
+        private static void ConnectBatch(ConnectionConfigurationElement connConf)
         {
             var tasks = new Task[Arguments.BatchSize];
 
             for (int i = 0; i < Arguments.BatchSize; i++)
             {
-                tasks[i] = ConnectSingle();
+                tasks[i] = ConnectSingle(connConf);
             }
 
-            await Task.WhenAll(tasks);
+            Task.WhenAll(tasks);
         }
 
-        private static async Task ConnectSingle()
+        private static Task ConnectSingle(ConnectionConfigurationElement connConf)
         {
-            var connection = CreateConnection();
+            var connection = Factory.CreateConnection(connConf.Url, connConf.Proxy, connConf.Channel);
+
+            connection.Closed += () =>
+            {
+                Connections.TryTake(out connection);
+            };
+
+            connection.Items.Add("name", RandomGenerator.Name());
+
+            Connections.Add(connection);
+
+            List<Connection> connectionsList = new List<Connection>();
+            if (!ConnectionsDictionary.TryGetValue(connConf.Name, out connectionsList))
+            {
+                ConnectionsDictionary.TryAdd(connConf.Name, new List<Connection>());
+            }
+            ConnectionsDictionary[connConf.Name].Add(connection);
 
             try
             {
                 if (Arguments.Transport == null)
                 {
-                    await connection.Start();
+                    return connection.Start();
                 }
                 else
                 {
-                    await connection.Start(Arguments.GetTransport());
+                    return connection.Start(Arguments.GetTransport());
                 }
-
-                connection.Closed += () =>
-                {
-                    Connections.TryTake(out connection);
-                };
-
-                connection.Items.Add("name", RandomGenerator.Name());
-
-                Connections.Add(connection);
             }
             catch (Exception e)
             {
                 Console.WriteLine("Connection.Start Failed: {0}: {1}", e.GetType(), e.Message);
+                return new Task(() => { throw e; });
             }
-        }
-
-        private static Connection CreateConnection()
-        {
-	        return Factory.CreateConnection(Arguments.Url);
         }
     }
 }

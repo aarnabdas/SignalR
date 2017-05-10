@@ -9,21 +9,46 @@ using System.Threading.Tasks;
 
 namespace Microsoft.AspNet.SignalR.Client
 {
-    public class HubConnectionD: Connection
+    public class HubConnectionD : Connection
     {
+        #region private variables
+
+        string _url = string.Empty;
+        string _proxy = string.Empty;
+        string _channel = string.Empty;
+
         HubConnection connection { get; set; }
         IHubProxy customHub { get; set; }
 
+        #endregion private variables
+
+        #region public constructors
+
         public HubConnectionD(string url)
+            : this(url, "", "")
+        {
+        }
+
+        public HubConnectionD(string url, string proxy, string channel)
             : base(url)
         {
+            _url = url;
+            _proxy = proxy;
+            _channel = channel;
+
             this.State = ConnectionState.Disconnected;
-            connection = new HubConnection(url);
-            customHub = connection.CreateHubProxy("messageHub");
+            connection = new HubConnection(_url);
+
+            if (!string.IsNullOrEmpty(proxy))
+            {
+                customHub = connection.CreateHubProxy(_proxy);
+            }
 
             connection.Received += connection_Received;
-            connection.StateChanged +=connection_StateChanged;
+            connection.StateChanged += connection_StateChanged;
         }
+
+        #endregion public constructors
 
         private void connection_StateChanged(StateChange obj)
         {
@@ -48,16 +73,17 @@ namespace Microsoft.AspNet.SignalR.Client
         public override Task Start()
         {
             this.ChangeState(ConnectionState.Disconnected, ConnectionState.Connecting);
-            return connection.Start().ContinueWith(task => {
+            return connection.Start().ContinueWith(task =>
+            {
                 if (task.IsFaulted)
                 {
                     Console.WriteLine("There was an error opening the connection:{0}",
                                       task.Exception.GetBaseException());
                 }
-                else
+                else if (!string.IsNullOrEmpty(_channel))
                 {
-                    //  $.connection.hub.createHubProxy('messageHub').invoke('subscribe','Team A');
-                    customHub.Invoke<string>("Subscribe", "Team A").ContinueWith(subTask => {
+                    customHub.Invoke<string>("Subscribe", _channel).ContinueWith(subTask =>
+                    {
                         if (subTask.IsFaulted)
                         {
                             Console.WriteLine("Exception occurred during subscription: {0}", subTask.Exception.GetBaseException());
@@ -67,6 +93,10 @@ namespace Microsoft.AspNet.SignalR.Client
                             this.ChangeState(ConnectionState.Connecting, ConnectionState.Connected);
                         }
                     });
+                }
+                else
+                {
+                    this.ChangeState(ConnectionState.Connecting, ConnectionState.Connected);
                 }
             });
         }
@@ -78,14 +108,14 @@ namespace Microsoft.AspNet.SignalR.Client
 
         public override Task Send(string data)
         {
-            //Thread.Sleep(500);
-            return customHub.Invoke<string>("Send", data).ContinueWith(task => {
-                 if (task.IsFaulted)
-                 {
-                     Console.WriteLine("There was an error calling send: {0}",
-                                       task.Exception.GetBaseException());
-                 }
-             });
+            return customHub.Invoke<string>("Send", data).ContinueWith(task =>
+            {
+                if (task.IsFaulted)
+                {
+                    Console.WriteLine("There was an error calling send: {0}",
+                                      task.Exception.GetBaseException());
+                }
+            });
         }
 
         protected override void Dispose(bool disposing)

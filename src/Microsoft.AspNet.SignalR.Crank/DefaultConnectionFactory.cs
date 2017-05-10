@@ -16,5 +16,11 @@ namespace Microsoft.AspNet.SignalR.Crank
 		{
 			return new Connection(url);
 		}
-	}
+
+
+        public Connection CreateConnection(string url, string proxy, string channel)
+        {
+            throw new NotImplementedException();
+        }
+    }
 }

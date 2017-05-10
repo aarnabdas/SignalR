@@ -15,5 +15,6 @@ namespace Microsoft.AspNet.SignalR.Crank
 	public interface IConnectionFactory
 	{
 		Connection CreateConnection(string url);
+        Connection CreateConnection(string url, string proxy, string channel);
 	}
 }

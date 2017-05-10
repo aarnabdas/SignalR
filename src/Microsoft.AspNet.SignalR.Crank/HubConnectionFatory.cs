@@ -14,5 +14,10 @@ namespace Microsoft.AspNet.SignalR.Crank
         {
             return new HubConnectionD(url);
         }
+
+        Connection IConnectionFactory.CreateConnection(string url, string proxy, string channel)
+        {
+            return new HubConnectionD(url, proxy, channel);
+        }
     }
 }

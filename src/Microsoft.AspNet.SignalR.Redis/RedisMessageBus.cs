@@ -52,7 +52,7 @@ namespace Microsoft.AspNet.SignalR.Redis
 
             _traceManager = resolver.Resolve<ITraceManager>();
 
-            _trace = _traceManager["SignalR." + nameof(RedisMessageBus)];
+            _trace = _traceManager["SignalR.RedisMessageBus"];
 
             ReconnectDelay = TimeSpan.FromSeconds(2);
 
@@ -89,7 +89,7 @@ namespace Microsoft.AspNet.SignalR.Redis
 
         protected override void Dispose(bool disposing)
         {
-            _trace.TraceInformation(nameof(RedisMessageBus) + " is being disposed");
+            _trace.TraceInformation("RedisMessageBus" + " is being disposed");
             if (disposing)
             {
                 var oldState = Interlocked.Exchange(ref _state, State.Disposing);
@@ -258,7 +258,7 @@ namespace Microsoft.AspNet.SignalR.Redis
 
             _trace.TraceInformation("Connecting...");
 
-            await _connection.ConnectAsync(_connectionString, _traceManager["SignalR." + nameof(RedisConnection)]);
+            await _connection.ConnectAsync(_connectionString, _traceManager["SignalR." + "RedisConnection"]);
 
             _trace.TraceInformation("Connection opened");
 

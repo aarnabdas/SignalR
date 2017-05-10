@@ -15,7 +15,7 @@ namespace Microsoft.AspNet.SignalR.Redis
         private TraceSource _trace;
         private ulong _latestMessageId;
 
-        public async Task ConnectAsync(string connectionString, TraceSource trace)
+        public async Task ConnectAsync(string connectionString, TraceSource trace = null)
         {
             _connection = await ConnectionMultiplexer.ConnectAsync(connectionString, new TraceTextWriter("ConnectionMultiplexer: ", trace));
             if (!_connection.IsConnected)
@@ -29,6 +29,10 @@ namespace Microsoft.AspNet.SignalR.Redis
             _connection.ConnectionRestored += OnConnectionRestored;
             _connection.ErrorMessage += OnError;
 
+            if (trace == null)
+            {
+                trace = new TraceSource("CrankTrace");
+            }
             _trace = trace;
 
             _redisSubscriber = _connection.GetSubscriber();

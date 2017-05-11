@@ -81,6 +81,7 @@
     <Compile Include="..\Common\CommonVersionInfo.cs">
       <Link>Properties\CommonVersionInfo.cs</Link>
     </Compile>
+    <Compile Include="ConnectionSampler.cs" />
     <Compile Include="ConnectionsSample.cs" />
     <Compile Include="ControllerEvents.cs" />
     <Compile Include="ControllerHub.cs" />

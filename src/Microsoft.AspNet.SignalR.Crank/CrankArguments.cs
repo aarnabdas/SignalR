@@ -20,7 +20,7 @@ namespace Microsoft.AspNet.SignalR.Crank
         [CommandLineParameter(Command = "?", Name = "Help", Default = false, Description = "Show Help", IsHelp = true)]
         public bool Help { get; set; }
 
-        [CommandLineParameter(Command = "Url", Required = false, Description = "Server URL for SignalR connections")]
+        [CommandLineParameter(Command = "Url", Required = false, Description = "Deprecated. Use the configuration file to specify connection properties")]
         public string Url { get; set; }
 
         [CommandLineParameter(Command = "Transport", Required = false, Default = "auto", Description = "Transport name. Default: auto")]

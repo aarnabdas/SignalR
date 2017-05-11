@@ -19,7 +19,6 @@ namespace Microsoft.AspNet.SignalR.Crank
         private static CrankArguments Arguments;
         private static IDisposable AppHost = null;
         private static int ClientsConnected;
-        private static PerformanceCounters PerformanceCounters;
         private static List<ConnectionsSample> Samples = new List<ConnectionsSample>();
         private static int NextSample = 0;
         private static object FlushLock = new object();
@@ -54,7 +53,6 @@ namespace Microsoft.AspNet.SignalR.Crank
         internal static void Start(CrankArguments arguments)
         {
             ControllerHub.Arguments = arguments;
-            PerformanceCounters = new PerformanceCounters(new Uri(arguments.Url).Host, arguments.SignalRInstance);
 
             ThreadPool.QueueUserWorkItem(_ => Run());
         }
@@ -89,12 +87,11 @@ namespace Microsoft.AspNet.SignalR.Crank
                 AppHost.Dispose();
             }
 
-            FlushLog(force:true);
+            FlushLog(force: true);
         }
 
         private static void RunConnect()
         {
-            InitializeLog();
             SignalPhaseChange(ControllerEvents.Connect);
             StartSampleLoop();
 
@@ -126,7 +123,7 @@ namespace Microsoft.AspNet.SignalR.Crank
         private static void RunSend()
         {
             var timeout = TestTimer.Elapsed.Add(TimeSpan.FromSeconds(Arguments.SendTimeout));
-            
+
             BlockWhilePhase(ControllerEvents.Send, breakCondition: () =>
             {
                 return TestTimer.Elapsed >= timeout;
@@ -166,12 +163,6 @@ namespace Microsoft.AspNet.SignalR.Crank
             });
         }
 
-        private static void InitializeLog()
-        {
-            File.WriteAllText(Arguments.LogFile, Environment.CommandLine + Environment.NewLine);
-            File.WriteAllText(Arguments.LogFile, "TestPhase,Elapsed,Connected,Reconnected,Disconnected,ServerAvailableMBytes,ServerTcpConnectionsEst" + Environment.NewLine);
-        }
-
         private static void FlushLog(bool force = false)
         {
             if (Samples.Count == 0)
@@ -193,7 +184,6 @@ namespace Microsoft.AspNet.SignalR.Crank
                         }
                         var args = new object[] { sample.TestPhase, sample.TimeStamp, sample.Connected, sample.Reconnected, sample.Disconnected, sample.ServerAvailableMBytes, sample.ServerTcpConnectionsEst };
                         Console.WriteLine("{1} ({0}): {2} Connected, {3} Reconnected, {4} Disconnected, {5} AvailMBytes, {6} TcpConnEst", args);
-                        File.AppendAllText(Arguments.LogFile, String.Format("{0},{1},{2},{3},{4},{5},{6}", args) + Environment.NewLine);
                     }
                 }
             }
@@ -202,7 +192,7 @@ namespace Microsoft.AspNet.SignalR.Crank
         private static bool WaitForClientsToConnect()
         {
             Console.WriteLine("Waiting on Clients...");
-            
+
             int attempts = 0;
 
             while (ClientsConnected < Arguments.NumClients)
@@ -221,7 +211,7 @@ namespace Microsoft.AspNet.SignalR.Crank
 
         private static int GetExpectedSampleCount()
         {
-            return PerformanceCounters.SignalRCountersAvailable ? 1 : Arguments.NumClients;
+            return Arguments.NumClients;
         }
 
         private static void WaitForLastSamples()
@@ -272,27 +262,17 @@ namespace Microsoft.AspNet.SignalR.Crank
 
         private static void SignalSample(TimeSpan timestamp)
         {
-            Samples.Add(new ConnectionsSample(Enum.GetName(typeof(ControllerEvents), TestPhase), timestamp, PerformanceCounters.ServerAvailableMBytes, PerformanceCounters.ServerTcpConnectionsEst));
+            Samples.Add(new ConnectionsSample(Enum.GetName(typeof(ControllerEvents), TestPhase), timestamp, 1000, 0));
 
-            if (PerformanceCounters.SignalRCountersAvailable)
+
+            // Use client connection states
+            if (AppHost == null)
             {
-                ControllerHub.MarkInternal(Samples.Count - 1, new int[] {
-                    PerformanceCounters.SignalRConnectionsCurrent,
-                    PerformanceCounters.SignalRConnectionsReconnected,
-                    PerformanceCounters.SignalRConnectionsDisconnected
-                });
+                Client.OnSample(Samples.Count - 1);
             }
             else
             {
-                // Use client connection states
-                if (AppHost == null)
-                {
-                    Client.OnSample(Samples.Count - 1);
-                }
-                else
-                {
-                    BroadcastEvent(ControllerEvents.Sample, Samples.Count - 1);
-                }
+                BroadcastEvent(ControllerEvents.Sample, Samples.Count - 1);
             }
         }
 

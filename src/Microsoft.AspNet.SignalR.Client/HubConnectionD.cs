@@ -16,25 +16,29 @@ namespace Microsoft.AspNet.SignalR.Client
         string _url = string.Empty;
         string _proxy = string.Empty;
         string _channel = string.Empty;
+        string _connName = string.Empty;
 
         HubConnection connection { get; set; }
         IHubProxy customHub { get; set; }
 
         #endregion private variables
 
+        public Action<string, string> MessageReceived;
+
         #region public constructors
 
         public HubConnectionD(string url)
-            : this(url, "", "")
+            : this(url, "", "", "")
         {
         }
 
-        public HubConnectionD(string url, string proxy, string channel)
+        public HubConnectionD(string url, string proxy, string channel, string connName)
             : base(url)
         {
             _url = url;
             _proxy = proxy;
             _channel = channel;
+            _connName = connName;
 
             this.State = ConnectionState.Disconnected;
             connection = new HubConnection(_url);
@@ -55,9 +59,12 @@ namespace Microsoft.AspNet.SignalR.Client
             this.ChangeState(obj.NewState, this.State);
         }
 
-        private void connection_Received(string obj)
+        private void connection_Received(string msg)
         {
-            Console.WriteLine(obj);
+            if (MessageReceived != null)
+            {
+                MessageReceived(_connName, msg);
+            }
         }
 
         public override Task Start(IHttpClient httpClient)

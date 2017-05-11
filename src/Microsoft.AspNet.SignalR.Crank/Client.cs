@@ -22,10 +22,9 @@ namespace Microsoft.AspNet.SignalR.Crank
         private static ConcurrentBag<Connection> Connections = new ConcurrentBag<Connection>();
         private static ConcurrentDictionary<string, List<Connection>> ConnectionsDictionary = new ConcurrentDictionary<string, List<Connection>>();
         private static ConcurrentBag<IHubProxy> HubProxies = new ConcurrentBag<IHubProxy>();
-        private static HubConnection ControllerConnection;
-        private static IHubProxy ControllerProxy;
         private static ControllerEvents TestPhase = ControllerEvents.None;
         private static IConnectionFactory Factory;
+        private static List<ConnectionConfigurationElement> ConnectionConfList;
 
         public static void Main()
         {
@@ -36,12 +35,16 @@ namespace Microsoft.AspNet.SignalR.Crank
 
             ComposeConnectionFactory();
 
+            ReadConfiguration();
+            ConnectionSampler.Init(ConnectionConfList);
             if (Arguments.IsController)
             {
                 ControllerHub.Start(Arguments);
             }
 
             Run().Wait();
+
+            ConnectionSampler.WriteLog(Arguments.LogFile, Arguments.SendTimeout).Wait();
         }
 
         private static void ComposeConnectionFactory()
@@ -77,14 +80,6 @@ namespace Microsoft.AspNet.SignalR.Crank
 
         private static async Task Run()
         {
-            var remoteController = !Arguments.IsController || (Arguments.NumClients > 1);
-
-            if (remoteController)
-            {
-                await OpenControllerConnection();
-                Console.WriteLine("Waiting on Controller...");
-            }
-
             while (TestPhase != ControllerEvents.Connect)
             {
                 if (TestPhase == ControllerEvents.Abort)
@@ -96,68 +91,10 @@ namespace Microsoft.AspNet.SignalR.Crank
                 await Task.Delay(CrankArguments.ConnectionPollIntervalMS);
             }
 
-            //DAL.MessageItemsLayer.ClearMessages();
-
             await RunConnect();
             await RunSend();
 
             RunDisconnect();
-
-            if (remoteController)
-            {
-                CloseControllerConnection();
-            }
-        }
-
-        private static async Task OpenControllerConnection()
-        {
-            ControllerConnection = new HubConnection(Arguments.ControllerUrl);
-            ControllerProxy = ControllerConnection.CreateHubProxy("ControllerHub");
-
-            ControllerProxy.On<ControllerEvents, int>("broadcast", (controllerEvent, id) =>
-            {
-                if (controllerEvent == ControllerEvents.Sample)
-                {
-                    OnSample(id);
-                }
-                else
-                {
-                    OnPhaseChanged(controllerEvent);
-                }
-            });
-
-            int attempts = 0;
-
-            while (true)
-            {
-                try
-                {
-                    await ControllerConnection.Start();
-
-                    break;
-                }
-                catch
-                {
-                    attempts++;
-
-                    if (attempts > CrankArguments.ConnectionPollAttempts)
-                    {
-                        throw new InvalidOperationException("Failed to connect to the controller hub");
-                    }
-                }
-
-                await Task.Delay(CrankArguments.ConnectionPollIntervalMS);
-            }
-        }
-
-        internal static void CloseControllerConnection()
-        {
-            if (ControllerConnection != null)
-            {
-                ControllerConnection.Stop();
-                ControllerConnection = null;
-                ControllerProxy = null;
-            }
         }
 
         internal static void OnPhaseChanged(ControllerEvents phase)
@@ -194,14 +131,14 @@ namespace Microsoft.AspNet.SignalR.Crank
                 states.Where(s => s == ConnectionState.Disconnected).Count()
             };
 
-            if (ControllerProxy != null)
-            {
-                ControllerProxy.Invoke("Mark", id, statesArr);
-            }
-            else
-            {
-                ControllerHub.MarkInternal(id, statesArr);
-            }
+            //if (ControllerProxy != null)
+            //{
+            //    ControllerProxy.Invoke("Mark", id, statesArr);
+            //}
+            //else
+            //{
+            ControllerHub.MarkInternal(id, statesArr);
+            //}
 
             if (!Arguments.IsController)
             {
@@ -248,6 +185,11 @@ namespace Microsoft.AspNet.SignalR.Crank
 
         private static async Task RunConnect()
         {
+            await Task.WhenAll(ConnectionConfList.Select(c => Connect(c)));
+        }
+
+        private static void ReadConfiguration()
+        {
             try
             {
                 ExeConfigurationFileMap configMap = new ExeConfigurationFileMap();
@@ -257,17 +199,13 @@ namespace Microsoft.AspNet.SignalR.Crank
                 ConnectionConfigurationSection configurationSection = (ConnectionConfigurationSection)config.GetSection("connections.conf");
                 if (configurationSection != null && configurationSection.Connections != null && configurationSection.Connections.Count > 0)
                 {
-                    int i = 0;
-                    Task[] connectTasks = new Task[configurationSection.Connections.Count];
+                    ConnectionConfList = new List<ConnectionConfigurationElement>();
+                    Arguments.Connections = 0;
                     foreach (ConnectionConfigurationElement connConf in configurationSection.Connections)
                     {
-                        connectTasks[i] = Task.Factory.StartNew(() =>
-                        {
-                            Connect(connConf);
-                        });
-                        i++;
+                        Arguments.Connections += connConf.Connections;
+                        ConnectionConfList.Add(connConf);
                     }
-                    await Task.WhenAll(connectTasks);
                 }
                 else
                 {
@@ -280,17 +218,17 @@ namespace Microsoft.AspNet.SignalR.Crank
             }
         }
 
-        private static void Connect(ConnectionConfigurationElement connConf)
+        private static async Task Connect(ConnectionConfigurationElement connConf)
         {
             int connectedCount = 0;
             do
             {
-                ConnectBatch(connConf);
+                await ConnectBatch(connConf);
                 connectedCount = ConnectionsDictionary[connConf.Name].Where(c => c.State == ConnectionState.Connected).Count();
             } while (connectedCount <= connConf.Connections);
         }
 
-        private static void ConnectBatch(ConnectionConfigurationElement connConf)
+        private static async Task ConnectBatch(ConnectionConfigurationElement connConf)
         {
             var tasks = new Task[Arguments.BatchSize];
 
@@ -298,13 +236,19 @@ namespace Microsoft.AspNet.SignalR.Crank
             {
                 tasks[i] = ConnectSingle(connConf);
             }
-
-            Task.WhenAll(tasks);
+            await Task.WhenAll(tasks);
         }
 
         private static Task ConnectSingle(ConnectionConfigurationElement connConf)
         {
-            var connection = Factory.CreateConnection(connConf.Url, connConf.Proxy, connConf.Channel);
+            var connection = Factory.CreateConnection(connConf.Url, connConf.Proxy, connConf.Channel, connConf.Name);
+
+            if (connection is HubConnectionD)
+            {
+                (connection as HubConnectionD).MessageReceived = (string connName, string msg) => {
+                    ConnectionSampler.AddMessage(connName, msg);
+                };
+            }
 
             connection.Closed += () =>
             {
